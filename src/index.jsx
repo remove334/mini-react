@@ -1,4 +1,3 @@
-import React from 'react'
 
 function Index() {
   return (
@@ -6,4 +5,16 @@ function Index() {
   )
 }
 
-export default Index
+
+const a = (
+    <div>
+        <div>
+            23
+        </div>
+        <ul>
+            <li>456</li>
+        </ul>
+    </div>
+)
+
+console.log(a)
