@@ -25,8 +25,10 @@ function App() {
     // return () => clearTimeout(timer);
   }, []);
 
+
   return (
     <div>
+      <span></span>
       <p>{count}</p>
       <button onClick={handleClick}>加一</button>
       <App2/>

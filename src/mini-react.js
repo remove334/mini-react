@@ -18,6 +18,10 @@
         return {
             type: "TEXT_ELEMENT",
             props: {
+                /* 
+                    createText 创建文本节点后 会直接nodeValue 赋值给文本节点，文本节点可以 通过nodeValue 
+                    直接设置值
+                 */
                 nodeValue,
                 children: []
             }
@@ -131,6 +135,7 @@
 
     }
 
+    /* 处理正常的dom */
     function updateHostComponent(fiber) {
         if (!fiber.dom) {
             fiber.dom = createDom(fiber)
@@ -139,19 +144,25 @@
         reconcileChildren(fiber, fiber.props.children)
     }
 
+    /* 创建dom 节点 区分文本节点和 标签节点  */
     function createDom(fiber) {
         const dom = fiber.type === 'TEXT_ELEMENT' ? document.createTextNode("") : document.createElement(fiber.type)
+        /* 这里第二个参数是 {} 空对象 标识其实 本次的props是完全全新的  */
         updateDom(dom, {}, fiber.props)
 
         return dom
     }
-
+    /* 属性是否是事件 */
     const isEvent = key => /^(on)/i.test(key)
+    /* 是否是事件以外的property */
     const isProperty = key => (key !== "children") && (!isEvent(key))
+    /* 柯里化函数判断新旧 数据内容是否一样 */
     const isNew = (prev, next) => key => prev[key] !== next[key]
+    /* 判断key 是否不在 对象当中 */
     const isGone = (next) => key => !(key in next)
 
 
+    /* 处理dom的事件 和property */
     function updateDom(dom, prevProps, nextProps) {
         /* 清除上一次的事件 */
         Object.keys(prevProps).filter(isEvent).filter((key) => {
@@ -177,17 +188,24 @@
     }
 
 
+    /* 这里的  reconcileChildren 和上面 的 performUnitOfWork
+        是稍微有一点重叠的处理
+        reconcileChildren 只处理当前节点下的子节点，而performUnitOfWork 是循环的每一个节点的
+        reconcileChildren会访问一遍子节点 performUnitOfWork 会访问所有的节点
+
+
+    */
     function reconcileChildren(wipFiber, elements) {
         let index = 0
+        /* 当前fiber 节点的第一个子节点 */
         let oldFiber = wipFiber.alternate?.child
         let prevSibling = null
 
         while (index < elements.length || oldFiber != null) {
             const element = elements[index]
             let newFiber = null
-
             const sameType = element?.type == oldFiber?.type
-
+            /* 如果新的节点和旧的节点类型一样，那就走更新 */
             if (sameType) {
                 newFiber = {
                     type: oldFiber.type,
@@ -198,6 +216,7 @@
                     effectTag: "UPDATE"
                 }
             }
+            /* 如果这个节点 在新的状况有 并且和之前的节点不一样 那么久走新增 */
             if (element && !sameType) {
                 newFiber = {
                     type: element.type,
@@ -209,16 +228,37 @@
 
                 }
             }
+            /* 如果旧的节点有，但是和之前的不一样，那就走删除 */
             if (oldFiber && !sameType) {
                 oldFiber.effectTag = "DELETION"
                 deletions.push(oldFiber)
             }
+            /* 子元素的下一个 */
+            /* 此时 如果子节点是多个的话 多个子节点是呈现一个链表结构的
+                  比如 
+                  <div>
+                      <p>1</p>
+                      <span>2</span>
+                  </div>
+
+                  div 的child 是p  p的sibling 是span 
+               */
             if (oldFiber) {
                 oldFiber = oldFiber.sibling
             }
+            /* 如果是第一次的遍历的话，就把标记后的节点，return 指向当前的节点 */
             if (index === 0) {
+                /* 如果是第一次的话 就将 本次 reconcileChildren 的节点 的child 指向 newFiber
+                    此时newFiber 是当前节点的第一个子节点
+                 */
                 wipFiber.child = newFiber
             } else if (element) {
+                /* 这个地方稍微有点迷惑性
+                    此时prevSibling 如果不是第一次进入的话
+                    就指向了 newFiber 也就是当前的这一个子节点,
+                    等到下一次循环,这个变量指向的是上一次的fiber,由于打标签后
+                    是一个新的fiber节点对象,需要将上一个的节点的sibling 指向当前节点
+                 */
                 prevSibling.sibling = newFiber
             }
 
