@@ -192,8 +192,6 @@
         是稍微有一点重叠的处理
         reconcileChildren 只处理当前节点下的子节点，而performUnitOfWork 是循环的每一个节点的
         reconcileChildren会访问一遍子节点 performUnitOfWork 会访问所有的节点
-
-
     */
     function reconcileChildren(wipFiber, elements) {
         let index = 0
@@ -261,7 +259,7 @@
                  */
                 prevSibling.sibling = newFiber
             }
-
+            /* 变量赋值给当前节点 */
             prevSibling = newFiber
 
             index++
@@ -270,27 +268,33 @@
         }
 
     }
-
+    /* commit 阶段 reconcile 完成之后 触发 */
     function commitRoot() {
+        /* 先执行删除操作 */
         deletions.forEach(commitWork)
-
+        /* 在依次派发 */
         commitWork(wipRoot.child)
+        /* 执行组件 effect  */
         commitEffectHooks()
+        /* wipRoot 赋值给currentRoot */
         currentRoot = wipRoot
+        /*  wipRoot清空 表示reconcile 阶段结束 */
         wipRoot = null
         deletions = []
     }
 
+    /* fiber 单元素commit 执行 */
     function commitWork(fiber) {
         if (!fiber) return
 
         let domParentFiber = fiber.return
-
+        /* 拿到最近一层的父级dom */
         while (!domParentFiber.dom) {
             domParentFiber = domParentFiber.return
         }
 
         const domParent = domParentFiber.dom
+        /* 执行增删改 */
         if (fiber.effectTag === "PLACEMENT" && fiber.dom !== null) {
             domParent.appendChild(fiber.dom)
         } else if (fiber.effectTag === "UPDATE" && fiber.dom !== null) {
@@ -298,11 +302,11 @@
         } else if (fiber.effectTag === "DELETION") {
             commitDeletion(fiber, domParent)
         }
-
+        /* 递归执行 */
         commitWork(fiber.child)
         commitWork(fiber.sibling)
     }
-
+    /* 删除行为 */
     function commitDeletion(fiber, domParent) {
         if (fiber.dom) {
             domParent.removeChild(fiber.dom)
@@ -311,11 +315,15 @@
         }
     }
 
+    /* 函数组件 useEffect 的 执行 */
     function commitEffectHooks() {
+
+        /* 先执行 销毁函数 */
         function runCleanup(fiber) {
             if (!fiber) return
             fiber.alternate?.effectHooks?.forEach((action, index) => {
                 const deps = fiber.effectHooks[index]?.deps
+                /* 如果依赖有变动,需要执行上一次 useEffect 返回的函数 */
                 if (!action.deps || !isDepsEqual(action.deps, deps)) {
                     action.cleanup?.()
                 }
@@ -324,11 +332,12 @@
             runCleanup(fiber.sibling)
         }
 
-
+        /* 执行effect 判断如果依赖有改变的话  就执行 */
         function run(fiber) {
             if (!fiber) return
 
             fiber.effectHooks?.forEach((newHook, index) => {
+                /* 如果 依赖是一个空数组的话 就只在mount 的时候执行一次 */
                 if (!fiber.alternate) {
                     newHook.cleanup = newHook.callback()
                     return
@@ -356,7 +365,7 @@
         run(wipRoot)
 
     }
-
+    /* 对比依赖数组是否发生改变 */
     function isDepsEqual(deps, newDeps) {
         if (deps.length !== newDeps.length) return false
 
@@ -369,29 +378,33 @@
     }
 
 
+    /* 状态数据 */
     function useState(initialState) {
         /* 这个currentfiber 取值的时候 usestate 是在当前的这个函数组件执行的，也就是会拿到当前这个组件的fiber 节点 */
         const currentFiber = wipFiber
 
         const oldHook = wipFiber.alternate?.stateHooks[stateHooksIndex]
-
+        /* 状态数据的缓存 */
         const stateHook = {
             state: oldHook ? oldHook.state : initialState,
             queue: oldHook ? oldHook.queue : []
         }
-
+        /* 获取到最新的状态数据 */
         stateHook.queue.forEach(action => {
             stateHook.state = action(stateHook.state)
         })
-
+        /* 清空 setState 队列 */
         stateHook.queue = []
+        /* hooks索引递增 */
         stateHooksIndex++
         wipFiber.stateHooks.push(stateHook)
 
+        /* setState 改变状态数据函数 */
         function setState(action) {
             const isFunction = typeof action === "function"
+            /* 如果是函数的话 就直接进入队列,不是的话做一下统一化处理 */
             stateHook.queue.push(isFunction ? action : () => action)
-
+            /* wipRoot 指向当前的fiber 单节点 */
             wipRoot = {
                 ...currentFiber,
                 alternate: currentFiber
@@ -405,6 +418,7 @@
 
     }
 
+    /* 副作用函数 进入组件副作用队列 */
     function useEffect(callback, deps) {
         const effectHook = {
             callback,
