@@ -4,12 +4,16 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "cd dist && npx http-server -p 9527"
+    "start": "tsc -w",
+    "start:server": "http-server -p 9527"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "http-server": "^14.1.1"
   }
 }
